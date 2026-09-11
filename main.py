@@ -1,191 +1,519 @@
-import os
-from datetime import datetime
-import pandas as pd
-import sounddevice as sd
-import soundfile as sf
-import joblib
-from feature_extraction import extract_features
+import tkinter as tk
+from ESP32_COM import ESP32Com
 
-SAMPLE_RATE = 16000
-RECORD_SECONDS = 5
+ESP32_COM = ESP32Com()
+ESP32_COM.start()   # runs the socket loop in a background thread
 
-RECORDINGS_FOLDER = "recordings"
+# -------------------- Colors --------------------
+BG = "#0b0f19"
+CARD_BG = "#111827"
+BORDER = "#1f2937"
+TEXT = "#f3f4f6"
+MUTED = "#9ca3af"
 
-MODEL1_PATH = "cry_detector.pkl"
-MODEL2_PATH = "cry_classifier.pkl"
+GREEN = "#22c55e"
+YELLOW = "#f59e0b"
+RED = "#ef4444"
+BLUE = "#38bdf8"
+PURPLE = "#a78bfa"
 
-os.makedirs(RECORDINGS_FOLDER, exist_ok=True)
+# Main Window
+window = tk.Tk()
 
-# Load models
-model1 = joblib.load(MODEL1_PATH)
-model2 = joblib.load(MODEL2_PATH)
+window.title("Smart Nursery")
+window.geometry("1100x750")
+window.minsize(800, 600)
+window.configure(bg=BG)
 
-print("Models loaded successfully.")
-print("Starting baby cry detection...")
-print()
+# Header
+header = tk.Frame(
+    window,
+    bg=BG
+)
 
+header.pack(
+    fill="x",
+    pady=(25, 20)
+)
 
-columns = [
-    "Amplitude_Envelope_Mean",
-    "RMS_Mean",
-    "ZCR_Mean",
-    "STFT_Mean",
-    "SC_Mean",
-    "SBAN_Mean",
-    "SCON_Mean",
-    "MFCCs13Mean",
-    "delMFCCs13",
-    "del2MFCCs13",
-    "MelSpec",
-    "MFCCs20",
-    "MFCCs1",
-    "MFCCs2",
-    "MFCCs3",
-    "MFCCs4",
-    "MFCCs5",
-    "MFCCs6",
-    "MFCCs7",
-    "MFCCs8",
-    "MFCCs9",
-    "MFCCs10",
-    "MFCCs11",
-    "MFCCs12",
-    "MFCCs13"
-]
+title = tk.Label(
+    header,
+    text="Smart Nursery",
+    font=("Arial", 30, "bold"),
+    fg="white",
+    bg=BG
+)
 
-def prepare_features(file_path):
+title.pack()
 
-    features = extract_features(file_path)
+subtitle = tk.Label(
+    header,
+    text="Real-Time Baby Monitoring System",
+    font=("Arial", 12),
+    fg=MUTED,
+    bg=BG
+)
 
-    data = pd.DataFrame(
-        [features],
-        columns=columns
+subtitle.pack(pady=(5, 0))
+
+# Dashboard Container
+dashboard = tk.Frame(
+    window,
+    bg=BG
+)
+
+dashboard.pack(
+    fill="both",
+    expand=True,
+    padx=30
+)
+
+# Make 3 columns equal width
+for column in range(3):
+    dashboard.columnconfigure(column, weight=1)
+
+for row in range(5):
+    dashboard.rowconfigure(row, weight=1)
+
+# Card Function
+def create_card(parent, row, column, title_text, icon,
+                columnspan=1):
+
+    card = tk.Frame(
+        parent,
+        bg=CARD_BG,
+        highlightbackground=BORDER,
+        highlightthickness=1
     )
 
-    # These two were not used when training
-    X = data.drop(
-        columns=["MelSpec", "MFCCs20"]
+    card.grid(
+        row=row,
+        column=column,
+        columnspan=columnspan,
+        sticky="nsew",
+        padx=8,
+        pady=8
     )
 
-    return X
-
-def record_audio():
-
-    print("Recording for 5 seconds...")
-
-    audio = sd.rec(
-        int(RECORD_SECONDS * SAMPLE_RATE),
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        dtype="float32"
+    # Internal padding
+    content = tk.Frame(
+        card,
+        bg=CARD_BG
     )
 
-    sd.wait()
+    content.pack(
+        fill="both",
+        expand=True,
+        padx=20,
+        pady=15
+    )
 
-    print("Recording finished.")
+    # Icon
+    icon_label = tk.Label(
+        content,
+        text=icon,
+        font=("Arial", 25),
+        fg=TEXT,
+        bg=CARD_BG
+    )
 
-    return audio.flatten()
+    icon_label.pack(
+        anchor="w"
+    )
+
+    # Card title
+    title_label = tk.Label(
+        content,
+        text=title_text.upper(),
+        font=("Arial", 10),
+        fg=MUTED,
+        bg=CARD_BG
+    )
+
+    title_label.pack(
+        anchor="w",
+        pady=(5, 5)
+    )
+
+    # Value
+    value_label = tk.Label(
+        content,
+        text="Unknown",
+        font=("Arial", 21, "bold"),
+        fg=TEXT,
+        bg=CARD_BG
+    )
+
+    value_label.pack(
+        anchor="w"
+    )
+
+    return value_label
+
+# Cards
+# Baby
+baby_state = create_card(
+    dashboard,
+    0,
+    0,
+    "Baby",
+    "👶"
+)
+
+# Cry status
+cry_state = create_card(
+    dashboard,
+    0,
+    1,
+    "Status",
+    "🔊"
+)
+
+# Room
+room_state = create_card(
+    dashboard,
+    0,
+    2,
+    "Room",
+    "🏠"
+)
+
+# Light
+light_state = create_card(
+    dashboard,
+    1,
+    0,
+    "Room Light",
+    "💡"
+)
+
+# Temperature
+temperature_card = tk.Frame(
+    dashboard,
+    bg=CARD_BG,
+    highlightbackground=BORDER,
+    highlightthickness=1
+)
+
+temperature_card.grid(
+    row=1,
+    column=1,
+    columnspan=2,
+    sticky="nsew",
+    padx=8,
+    pady=8
+)
+
+temperature_content = tk.Frame(
+    temperature_card,
+    bg=CARD_BG
+)
+
+temperature_content.pack(
+    fill="both",
+    expand=True,
+    padx=20,
+    pady=15
+)
+
+tk.Label(
+    temperature_content,
+    text="🌡️",
+    font=("Arial", 25),
+    fg=TEXT,
+    bg=CARD_BG
+).pack(anchor="w")
+
+tk.Label(
+    temperature_content,
+    text="TEMPERATURE",
+    font=("Arial", 10),
+    fg=MUTED,
+    bg=CARD_BG
+).pack(anchor="w")
+
+temperature = tk.Label(
+    temperature_content,
+    text="0 °C",
+    font=("Arial", 32, "bold"),
+    fg=TEXT,
+    bg=CARD_BG
+)
+
+temperature.pack(anchor="w")
 
 
+# Fan
+fan_state = create_card(
+    dashboard,
+    2,
+    0,
+    "Fan",
+    "🌀"
+)
 
-def detect_cry(X):
+# Gas
+gas_state = create_card(
+    dashboard,
+    2,
+    1,
+    "Gas / Smoke",
+    "⚠️"
+)
 
-    prediction = model1.predict(X)[0]
+# Buzzer
+buzzer_state = create_card(
+    dashboard,
+    2,
+    2,
+    "Alert",
+    "🔔"
+)
 
-    probabilities = model1.predict_proba(X)[0]
+# Servo
+servo_state = create_card(
+    dashboard,
+    3,
+    0,
+    "Crib",
+    "⚙️"
+)
 
-    if prediction == 1:
+# AI Card
+ai_card = tk.Frame(
+    dashboard,
+    bg="#17132b",
+    highlightbackground=BORDER,
+    highlightthickness=1
+)
 
-        confidence = probabilities[1] * 100
+ai_card.grid(
+    row=3,
+    column=1,
+    columnspan=2,
+    sticky="nsew",
+    padx=8,
+    pady=8
+)
 
-        return "CRY", confidence
+ai_content = tk.Frame(
+    ai_card,
+    bg="#17132b"
+)
+
+ai_content.pack(
+    fill="both",
+    expand=True,
+    padx=20,
+    pady=15
+)
+
+tk.Label(
+    ai_content,
+    text="🧠",
+    font=("Arial", 25),
+    fg=TEXT,
+    bg="#17132b"
+).pack(anchor="w")
+
+tk.Label(
+    ai_content,
+    text="AI CRY CLASSIFICATION",
+    font=("Arial", 10),
+    fg=MUTED,
+    bg="#17132b"
+).pack(anchor="w")
+
+ai_state = tk.Label(
+    ai_content,
+    text="None",
+    font=("Arial", 25, "bold"),
+    fg=PURPLE,
+    bg="#17132b"
+)
+
+ai_state.pack(
+    anchor="w",
+    pady=(5, 0)
+)
+
+# Update Dashboard
+def update_dashboard(data):
+    # ---------------- Baby ----------------
+    if data["babyAwake"]:
+        baby_state.config(
+            text="Awake",
+            fg=BLUE
+        )
+    else:
+        baby_state.config(
+            text="Sleeping",
+            fg=GREEN
+        )
+
+    # ---------------- Cry ----------------
+    if data["cry"]:
+        cry_state.config(
+            text="Crying",
+            fg=RED
+        )
+    else:
+        cry_state.config(
+            text="Quiet",
+            fg=GREEN
+        )
+
+    # ---------------- Room ----------------
+    if data["dark"]:
+        room_state.config(
+            text="Dark",
+            fg=YELLOW
+        )
+    else:
+        room_state.config(
+            text="Bright",
+            fg=BLUE
+        )
+
+    # ---------------- Light ----------------
+    if data["light"]:
+        light_state.config(
+            text="ON",
+            fg=YELLOW
+        )
+    else:
+        light_state.config(
+            text="OFF",
+            fg=MUTED
+        )
+
+    # ---------------- Temperature ----------------
+    temperature.config(
+        text=f'{data["temperature"]} °C'
+    )
+
+    # ---------------- Fan ----------------
+    fan_state.config(
+        text=f'{data["fan"]}%'
+    )
+
+    # ---------------- Gas ----------------
+    if data["gas"]:
+
+        gas_state.config(
+            text="DANGER",
+            fg=RED
+        )
 
     else:
 
-        confidence = probabilities[0] * 100
+        gas_state.config(
+            text="Safe",
+            fg=GREEN
+        )
 
-        return "NOT CRY", confidence
+    # ---------------- Buzzer ----------------
+    if data["buzzer"]:
 
+        buzzer_state.config(
+            text="ON",
+            fg=RED
+        )
 
-def detect_cry_reason(X):
+    else:
 
-    prediction = model2.predict(X)[0]
+        buzzer_state.config(
+            text="OFF",
+            fg=MUTED
+        )
 
-    probabilities = model2.predict_proba(X)[0]
+    # ---------------- Servo ----------------
+    if data["servo"]:
 
-    class_names = {
-        0: "Discomfort",
-        1: "Hungry",
-        2: "Tired"
+        servo_state.config(
+            text="Rocking",
+            fg=BLUE
+        )
+
+    else:
+
+        servo_state.config(
+            text="Stopped",
+            fg=MUTED
+        )
+
+    # ---------------- AI ----------------
+    if data["classification"] == '0':
+        ai_state.config(
+            text="Hungry",
+            fg=RED
+        )
+    elif data["classification"] == '1':
+        ai_state.config(
+            text="Tired",
+            fg=YELLOW
+        )
+    elif data["classification"] == '2':
+        ai_state.config(
+            text="Discomfort",
+            fg=BLUE
+        )
+    else:
+        ai_state.config(
+            text="None",
+            fg=MUTED
+    )
+
+# Footer
+footer = tk.Frame(
+    window,
+    bg=BG
+)
+
+footer.pack(
+    fill="x",
+    pady=(10, 20)
+)
+
+separator = tk.Frame(
+    footer,
+    height=1,
+    bg=BORDER
+)
+
+separator.pack(
+    fill="x",
+    padx=30
+)
+
+tk.Label(
+    footer,
+    text="Smart Nursery • Team 10",
+    font=("Arial", 10),
+    fg="#6b7280",
+    bg=BG
+).pack(
+    pady=(10, 0)
+)
+
+def refresh_dashboard():
+    data = {
+        "babyAwake": ESP32_COM.get_classification() != '3',
+        "cry": ESP32_COM.get_classification() != '3',
+        "dark": ESP32_COM.dark,
+        "light": ESP32_COM.light,
+        "temperature": ESP32_COM.temperature,
+        "fan": ESP32_COM.fan,
+        "gas": ESP32_COM.gas_state,
+        "buzzer": ESP32_COM.buzzer_state,
+        "servo": ESP32_COM.servo_state,
+        "classification": ESP32_COM.get_classification()
     }
+    update_dashboard(data)
+    window.after(500, refresh_dashboard)  # poll every 500ms
 
-    reason = class_names[prediction]
+# Initial + recurring update
+refresh_dashboard()
 
-    confidence = probabilities[prediction] * 100
-
-    return reason, confidence
-
-
-try:
-
-    while True:
-
-        audio = record_audio()
-
-        timestamp = datetime.now().strftime(
-            "%Y-%m-%d_%H-%M-%S"
-        )
-
-        file_path = os.path.join(
-            RECORDINGS_FOLDER,
-            timestamp + ".wav"
-        )
-
-        sf.write(
-            file_path,
-            audio,
-            SAMPLE_RATE
-        )
-
-        print("Saved:", file_path)
-
-
-        X_new = prepare_features(file_path)
-
-        print("Feature shape:", X_new.shape)
-
-
-        cry_result, cry_confidence = detect_cry(X_new)
-
-        print(
-            f"Model 1: {cry_result} "
-            f"({cry_confidence:.2f}%)"
-        )
-
-        if cry_result == "CRY":
-
-            reason, reason_confidence = detect_cry_reason(
-                X_new
-            )
-
-            print(
-                f"Model 2: {reason} "
-                f"({reason_confidence:.2f}%)"
-            )
-
-            print(
-                f"\nFINAL VERDICT: {reason}\n"
-            )
-
-        else:
-
-            print(
-                "\nFINAL VERDICT: NOT CRY\n"
-            )
-
-        print("=" * 50)
-
-
-except KeyboardInterrupt:
-
-    print("\nDetection stopped.")
+# Start GUI
+window.mainloop()
