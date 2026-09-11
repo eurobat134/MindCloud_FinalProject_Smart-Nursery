@@ -2,6 +2,7 @@ import tkinter as tk
 from ESP32_COM import ESP32Com
 
 ESP32_COM = ESP32Com()
+ESP32_COM.send_telegram_message("Test message from Smart Nursery Guardian!")
 ESP32_COM.start()   # runs the socket loop in a background thread
 
 # -------------------- Colors --------------------

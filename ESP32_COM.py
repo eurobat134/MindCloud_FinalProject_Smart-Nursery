@@ -2,6 +2,7 @@ import socket
 import json
 import time
 import threading
+import requests
 from ML import AI
 
 class ESP32Com:
@@ -23,6 +24,11 @@ class ESP32Com:
         self._classification = '3'
 
         self._sock = None
+
+        # Telegram settings
+        self.telegram_token = "8621132177:AAGzrxxFvXgXIhrA-sK38SuRDyFr6MBFRmA"
+        self.telegram_chat_id = "1007414238"
+        self.last_gas_state = False
 
     def connect(self):
         while not self._stop_event.is_set():
@@ -57,6 +63,25 @@ class ESP32Com:
         if self._thread:
             self._thread.join(timeout=2)
 
+    def send_telegram_message(self, message):
+        url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+
+        payload = {
+            "chat_id": self.telegram_chat_id,
+            "text": message
+        }
+
+        try:
+            response = requests.post(url, json=payload, timeout=5)
+
+            if response.ok:
+                print("Telegram message sent!")
+            else:
+                print("Telegram error:", response.text)
+
+        except requests.RequestException as e:
+            print("Telegram connection error:", e)
+
     def _run(self):
         self._sock = self.connect()
         if self._sock is None:
@@ -86,12 +111,21 @@ class ESP32Com:
 
             classification = self.classify_cry()
 
+            gas_detected = bool(data.get("Gas"))
+
+            if gas_detected and not self.last_gas_state:
+                self.send_telegram_message(
+                    "WARNING!\n\nSmoke/Gas has been detected"
+                )
+
+            self.last_gas_state = gas_detected
+
             with self._lock:
                 self.dark = bool(data.get("Dark"))
                 self.light = bool(data.get("Light"))
                 self.temperature = int(data.get("Temperature"))
                 self.fan = data.get("Fan")
-                self.gas_state = bool(data.get("Gas"))
+                self.gas_state = gas_detected
                 self.buzzer_state = bool(data.get("Buzzer"))
                 self.servo_state = bool(data.get("Servo"))
                 self._classification = classification
